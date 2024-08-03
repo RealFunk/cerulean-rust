@@ -1,27 +1,13 @@
 
-mod lib;
-use lib::{framework, graphics, math};
-use framework::cwin;
-// use framework::cwin;
-// use graphics::{
-//     ccamera, 
-//     cmodel_instance, 
-//     cmodel, 
-//     craster, 
-//     cren, 
-//     ctransform 
-// };
-// use math::cmath;
-
-// mod cwin;
-// mod cren;
-// mod cmath;
-// mod cmodel;
-// mod cmodel_instance;
-// mod ctransform;
-// mod ccamera;
+pub mod framework;
+pub mod graphics;
+pub mod math;
 
 use std::clone;
+
+use framework::*;
+use graphics::*;
+use math::*;
 
 use cren::CRen;
 use cwin::CWin;
@@ -29,110 +15,41 @@ use cmodel::CModel;
 use cmodel_instance::CModelInstance;
 use ctransform::CTransform;
 use ccamera::CCamera;
+use math::cmatrix;
+use cmatrix::Matrix3x3;
+use cmatrix::Vec3;
 
 fn main() {
 
-    // let mut x = 100;
-    // let mut y = 0;
+    let mut angle: f64 = 0.0;
 
-    // let mut theta: f64 = 0.0;
+    let mut cube1: CModelInstance = cmodel_instance::new_cube(-2.0, 0.0, 10.0);
+    let mut cube2: CModelInstance = cmodel_instance::new_cube(2.0, 0.0, 10.0);
+    let mut cube3: CModelInstance = cmodel_instance::new_cube(3.0, 1.0, 15.0);
 
-    let cube1: CModelInstance = cmodel_instance::new_cube(-2.0, 0.0, 10.0);
-    let cube2: CModelInstance = cmodel_instance::new_cube(2.0, 0.0, 10.0);
+    let mut R: Matrix3x3 = Matrix3x3::new_rot(0.1, 0.1, 0.1);
+        cube1.transform.rot = R;
 
+    let mut camera: CTransform = ctransform::new(0.0, 0.0, 0.0);
     let mut ren: CRen = CRen::new(1066, 800);
     let mut win: cwin::CWin = CWin::new(&ren.raster);
 
+    let mut scene: Vec<CModelInstance> = Vec::<CModelInstance>::new();  //The CModelInstances live here!!
+    scene.push(cube1);
+    scene.push(cube2);
+    scene.push(cube3);
+
     while win.is_open() {
 
-        // theta += 0.01;
-        // if theta == 2.0*3.14 { theta -= 2.0*3.14; }
-        // x = (250.0 * theta.cos()) as i32;
-        // y = (250.0 * theta.sin()) as i32;
-        
-        // ren.fill_shaded_triangle(100 + x, 100 + y, 1.0, 300 - x, 400 + y, 0.5, 200 + x, 700 - y, 0.0, 
-        //     0x0000ff00);
+        angle += 0.025;
+        // if angle > 6.28 { angle -= 6.28; };
+        let mut R: Matrix3x3 = Matrix3x3::new_rot(0.5*angle, angle, -0.1*angle);
+        scene[0].transform.rot = R;
 
-        // ren.fill_shaded_triangle(400, 200, 0.0, 400, 400, 1.0, 400 + x, 400 + y, 0.0, 
-        //     0x0000ff00);
-
-        render_model_instance(&mut ren, &cube1);
-        render_model_instance(&mut ren, &cube2);
-
+        ren.render_scene(&camera, &scene);
         win.draw(&ren.raster);
         ren.clear();
 
     };
-
 }
-
-fn render_model_instance(ren: &mut CRen, instance: &CModelInstance) {
-    let mut projected: Vec<(i32, i32)> = Vec::<(i32, i32)>::new();
-    let mut vertices: Vec<(f64, f64, f64)> = instance.model.vertices.clone();
-
-    for v in vertices.iter_mut() {
-        scale_vec(v, instance.transform.scale);
-        //rot_vec()
-        transform_vec(v, instance.transform.pos);
-        projected.push(point_to_pixel_coords(v));
-    }
-
-    for t in instance.model.triangles.iter() {
-        ren.draw_triangle(
-            projected[t.0].0, projected[t.0].1, 
-            projected[t.1].0, projected[t.1].1, 
-            projected[t.2].0, projected[t.2].1, 
-            t.3
-        );
-    }
-}
-
-fn scale_vec(v: &mut (f64, f64, f64), k: f64) {
-    v.0 *= k;
-    v.1 *= k;
-    v.2 *= k;
-}
-
-fn transform_vec(v: &mut (f64, f64, f64), pos: (f64, f64, f64)) {
-    v.0 += pos.0;
-    v.1 += pos.1;
-    v.2 += pos.2;
-}
-
-fn render_model(ren: &mut CRen, model: &CModel) {
-
-    let mut projected: Vec<(i32, i32)> = Vec::<(i32, i32)>::new();
-    let mut vertices: Vec<(f64, f64, f64)> = model.vertices.clone();
-
-    for v in vertices.iter_mut() {
-        v.0 += -1.5;
-        v.1 +=  0.0;
-        v.2 +=  10.0;
-    }
-
-    for v in vertices.iter() {
-        projected.push(point_to_pixel_coords(v));
-    }
-
-    for t in model.triangles.iter() {
-        ren.draw_triangle(
-            projected[t.0].0, projected[t.0].1, 
-            projected[t.1].0, projected[t.1].1, 
-            projected[t.2].0, projected[t.2].1, 
-            t.3
-        );
-    }
-}
-
-fn point_to_pixel_coords(v: &(f64, f64, f64)) -> (i32, i32) {
-    let d = 1.0;
-    return viewpoirt_to_canvas( v.0*d/v.2, v.1*d/v.2 );
-}
-
-fn viewpoirt_to_canvas(x: f64, y: f64) -> (i32, i32) {
-    let Cw = 1066.0;
-    let Ch = 800.0;
-    let Vw = 1.0;
-    let Vh = 0.7505;
-    return ((x*Cw/Vw + 0.5) as i32 + 533, (y*Ch/Vh + 0.5) as i32 + 400);
-}
+    

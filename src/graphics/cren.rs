@@ -4,6 +4,8 @@ use crate::math::cmath;
 use crate::graphics::ccamera::CCamera;
 use crate::graphics::cmodel_instance::CModelInstance;
 
+use super::ctransform::CTransform;
+
 pub struct CRen {
     pub raster: CRaster,    //CRen owns its raster
 }
@@ -382,8 +384,99 @@ impl CRen {
         return  (r as u32)*256*256 + (g as u32)*256 + (b as u32);
     }
 
-    pub fn render_scene(&mut self, camera: &CCamera, scene: Vec<CModelInstance>) {
+    pub fn render_scene(&mut self, camera: &CTransform, scene: &Vec<CModelInstance>) {
 
+        /*
+        For each model instance {
+             - clone array of vertices
+             - create array of rasterized points
+            For each vertex in the cloned array {
+                //Perhaps do the following with matrix multiplication?
+                - scale according to model instance transform
+                - rotate according to model instance transform
+                - position according to model instance transform
+                - position according to camera
+                - rotate according to camera
+                - rasterize?
+            }
+            For each triangle {
+                - render triangle
+            }
+        }
+         */
+
+        for model_instance in scene.iter() {
+
+            let mut vertices: Vec<(f64, f64, f64)> = model_instance.model.vertices.clone();
+            let mut rasterized_vertices: Vec<(i32, i32)> = Vec::<(i32, i32)>::new();
+
+            //Affine transformations
+            for v in vertices.iter_mut() {
+                //model's scale
+                let k: f64 = model_instance.transform.scale;
+                v.0 *= k;
+                v.1 *= k;
+                v.2 *= k;
+
+                //model's rot
+                let M = &model_instance.transform.rot;
+                let (v1, v2, v3) = v.clone();
+                v.0 = M.e11*v1 + M.e12*v2 + M.e13*v3;
+                v.1 = M.e21*v1 + M.e22*v2 + M.e23*v3;
+                v.2 = M.e31*v1 + M.e32*v2 + M.e33*v3;
+
+                //model's pos
+                let xyz = model_instance.transform.pos;
+                v.0 += xyz.0;
+                v.1 += xyz.1;
+                v.2 += xyz.2;
+
+                //camera's pos
+                let xyz = camera.pos;
+                v.0 -= xyz.0;
+                v.1 -= xyz.1;
+                v.2 -= xyz.2;
+
+                //camera's rot
+                let M = &camera.rot;
+                let (v1, v2, v3) = v.clone();
+                v.0 = M.e11*v1 + M.e21*v2 + M.e31*v3;
+                v.1 = M.e12*v1 + M.e22*v2 + M.e32*v3;
+                v.2 = M.e13*v1 + M.e23*v2 + M.e33*v3;
+
+                //TODO: projection matrix?
+            }
+
+            //TODO: Do clipping here
+
+            //Rasterization
+            for v in vertices.iter() {
+                let rv: (i32, i32) = self.rasterize(camera, v);
+                rasterized_vertices.push(rv);
+            }
+
+            for triangle in model_instance.model.triangles.iter() {
+                let p0 = rasterized_vertices[triangle.0];
+                let p1 = rasterized_vertices[triangle.1];
+                let p2 = rasterized_vertices[triangle.2];
+                self.draw_triangle(p0.0, p0.1, p1.0, p1.1, p2.0, p2.1, triangle.3);
+            }
+        }
+    }
+
+    fn rasterize(&self, camera: &CTransform, v: &(f64, f64, f64)) -> (i32, i32) {
+
+        let d = 1.0;
+
+        return self.viewport_to_canvas( v.0*d/v.2, v.1*d/v.2 );
+    }
+    
+    fn viewport_to_canvas(&self, x: f64, y: f64) -> (i32, i32) {
+        let Cw = self.raster.width as f64;
+        let Ch = self.raster.height as f64;
+        let Vw = 1.0;
+        let Vh = Ch/Cw;
+        return ((x*Cw/Vw + 0.5) as i32 + 533, (y*Ch/Vh + 0.5) as i32 + 400);
     }
 
 }
