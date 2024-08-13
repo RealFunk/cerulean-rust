@@ -4,3 +4,4 @@ pub mod cmodel;
 pub mod craster;
 pub mod cren;
 pub mod ctransform;
+pub mod triangle;
